@@ -1,0 +1,1 @@
+"""Dense graph generation package."""
