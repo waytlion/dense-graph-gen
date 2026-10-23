@@ -1,8 +1,8 @@
-# Data & artifacts
+# Data, plots & artifacts
 data/
 *.pt
 *.pkl
-
+plots/generated_dense
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

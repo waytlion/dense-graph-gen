@@ -1,52 +1,92 @@
 import os
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
 import torch
-from torch_geometric.datasets import QM9
-from torch_geometric.utils import to_networkx, from_networkx
+from torch_geometric.datasets import QM9, ZINC, TUDataset
+from torch_geometric.utils import to_networkx
 import networkx as nx
 from tqdm import tqdm
+import argparse
+
+DATASET_DEFAULTS: Dict[str, Dict[str, int]] = {
+    "qm9": {"min_nodes": 6, "max_nodes": 9},
+    "zinc": {"min_nodes": 15, "max_nodes": 25},
+    "proteins": {"min_nodes": 30, "max_nodes": 50},
+    "collab": {"min_nodes": 50, "max_nodes": 90},
+}
 
 
-def load_and_filter_qm9(
-    root: str = "data/qm9",
-    cache_path: str = "data/qm9_base_unique.pt",
-    min_nodes: int = 6,
-    max_nodes: int = 9,
+def load_and_filter_base_graphs(
+    dataset_name: str = "qm9",
+    root: str = "data",
+    cache_path: Optional[str] = None,
+    min_nodes: Optional[int] = None,
+    max_nodes: Optional[int] = None,
     remove_hydrogens: bool = True,
+    only_connected: bool = True,
 ) -> List[nx.Graph]:
     """
-    Step 1: Load QM9, filter by node count N in [min_nodes, max_nodes],
-    strip node/edge features, and remove isomorphic duplicates.
+    Step 1: Load base dataset, filter by node count N in [min_nodes, max_nodes],
+    strip node/edge features, remove disconnected graphs, and remove isomorphic duplicates.
 
     Parameters:
-    - root: dir with raw and processed QM9 data
+    - dataset_name: name of base dataset ("qm9", "zinc", "proteins", "collab")
+    - root: directory with raw and processed data
     - cache_path: path to load/save cached list of unique NetworkX graphs
-    - min_nodes: min number of nodes N per G
-    - max_nodes: max number of nodes N per G
-    - remove_hydrogens: if True, removes hydrogen atoms (atomic number Z == 1),
-      keeping only heavy atoms (C, N, O, F).
+    - min_nodes: min number of nodes N per G (default from DATASET_DEFAULTS)
+    - max_nodes: max number of nodes N per G (default from DATASET_DEFAULTS)
+    - remove_hydrogens: if True (QM9 only), removes hydrogen atoms (Z == 1)
+    - only_connected: if True, keeps only connected base graphs
 
     Returns:
     - List of unique, unlabeled NetworkX graphs with N in [min_nodes, max_nodes].
     """
+    dataset_name = dataset_name.lower()
+    if dataset_name not in DATASET_DEFAULTS:
+        raise ValueError(
+            f"Unknown dataset '{dataset_name}'. Supported: {list(DATASET_DEFAULTS.keys())}"
+        )
+
+    defaults = DATASET_DEFAULTS[dataset_name]
+    min_nodes = min_nodes if min_nodes is not None else defaults["min_nodes"]
+    max_nodes = max_nodes if max_nodes is not None else defaults["max_nodes"]
+
+    if cache_path is None:
+        cache_path = os.path.join(root, f"{dataset_name}_base_unique.pt")
+
     if cache_path and os.path.exists(cache_path):
         print(f"Loading cached base graphs from {cache_path}...")
         return torch.load(cache_path, weights_only=False)
 
-    dataset = QM9(root=root) # on first exec load from PyG
+    # on first exec load from PyG
+    print(f"Loading raw dataset '{dataset_name}' from {root}...")
+    if dataset_name == "qm9":
+        dataset = QM9(root=os.path.join(root, "qm9"))
+    elif dataset_name == "zinc":
+        dataset = []
+        for split in ["train", "val", "test"]:
+            dataset.extend(
+                ZINC(root=os.path.join(root, "zinc"), subset=False, split=split)
+            )
+    elif dataset_name == "proteins":
+        dataset = TUDataset(root=os.path.join(root, "proteins"), name="PROTEINS")
+    elif dataset_name == "collab":
+        dataset = TUDataset(root=os.path.join(root, "collab"), name="COLLAB")
+    else:
+        raise ValueError(f"Unsupported dataset: {dataset_name}")
 
     unique_graphs: List[nx.Graph] = []
     seen_hashes = set()
 
-    print("Filtering graphs and removing attributes/duplicates...")
+    print(
+        f"Filtering {dataset_name} graphs (N in [{min_nodes}, {max_nodes}]) and removing attributes/duplicates..."
+    )
     for data in tqdm(dataset):
         G = to_networkx(data, to_undirected=True) # Convert PyG Data -> NetworkX graph
-        if remove_hydrogens:
+        if dataset_name == "qm9" and remove_hydrogens and hasattr(data, "z") and data.z is not None:
             heavy_nodes = [i for i, z_val in enumerate(data.z) if z_val.item() > 1] # data.z is the atomic number tensor: 1 corresponds to Hydrogen (H)
             G = G.subgraph(heavy_nodes).copy()
-            G = nx.convert_node_labels_to_integers(G) # without relabling -> Adj matrix creation causes out of bounds error (Relabel node indices to be 0-indexed [0, ..., N-1]
+            G = nx.convert_node_labels_to_integers(G) # without relabling -> Adj matrix creation causes out of bounds error 
 
-        # Filter by N
         num_nodes = G.number_of_nodes()
         if not (min_nodes <= num_nodes <= max_nodes):
             continue
@@ -55,6 +95,9 @@ def load_and_filter_qm9(
         G_unlabeled = nx.Graph()
         G_unlabeled.add_nodes_from(range(num_nodes))
         G_unlabeled.add_edges_from(G.edges())
+
+        if only_connected and not nx.is_connected(G_unlabeled):
+            continue
 
         # Deduplication via Weisfeiler-Lehman graph hash
         wl_hash = nx.weisfeiler_lehman_graph_hash(G_unlabeled)
@@ -69,6 +112,8 @@ def load_and_filter_qm9(
         print(f"Cached {len(unique_graphs)} graphs to {cache_path}")
 
     return unique_graphs
+
+
 
 
 def split_base_graphs(
@@ -195,7 +240,8 @@ def generate_paired_datasets(
         # Sample n_target pairs (idx_a, idx_b) with idx_a != idx_b
         for _ in range(n_target):
             pair = torch.randperm(pool_size, generator=g_cpu)[:2].tolist()
-            g_a = base_pool[pair[0]], g_b = base_pool[pair[1]]
+            g_a = base_pool[pair[0]] 
+            g_b = base_pool[pair[1]]
 
             # Construct dense (join) and sparse (union) adjacency matrices
             dense_list.append(create_pair_graph(g_a, g_b, mode="join"))
@@ -209,7 +255,28 @@ def generate_paired_datasets(
     print("Step 3 complete: Dense and sparse paired datasets generated.")
 
 
+def generate_for_dataset(dataset_name: str = "zinc") -> None:
+    """Generate paired dense (join) and sparse (union) datasets using default bounds."""
+    base_graphs = load_and_filter_base_graphs(dataset_name=dataset_name)
+    train_graphs, val_graphs, test_graphs = split_base_graphs(base_graphs)
+    generate_paired_datasets(
+        train_graphs,
+        val_graphs,
+        test_graphs,
+        dense_out_dir=f"data/cograph_{dataset_name}_dense",
+        sparse_out_dir=f"data/cograph_{dataset_name}_sparse",
+    )
+
+
 if __name__ == "__main__":
-    graphs = load_and_filter_qm9()
-    train_graphs, val_graphs, test_graphs = split_base_graphs(graphs)
-    generate_paired_datasets(train_graphs, val_graphs, test_graphs)
+    parser = argparse.ArgumentParser(description="Generate paired dense/sparse cograph datasets.")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="qm9",
+        choices=["qm9", "zinc", "proteins", "collab"],
+        help="Base dataset to load (default: qm9)",
+    )
+    args = parser.parse_args()
+    generate_for_dataset(args.dataset)
+
