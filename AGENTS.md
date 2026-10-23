@@ -36,7 +36,8 @@ We study **graph generation** (learning a distribution p(G) over graphs from sam
   - quick test: `python main.py +experiment=debug`
   - example dataset: `python main.py +experiment=tree dataset=tree`
   - evaluate a checkpoint: add `general.test_only=<path/to/ckpt>`
-- Larger training runs will happen on a Linux GPU cluster 
+- Larger training runs will happen on a Linux GPU cluster (TU Dresden `dataport1.hpc.tu-dresden.de`, user `tibo990i`).
+- **TODO (joint task):** The cluster's `$HOME` has a 50 GB quota. We need to redirect DeFoG outputs/checkpoints to a workspace (e.g. via `ws_allocate`). Do not make any changes without discussing with the user first.
 
 ## Extending DeFoG with a new dataset (from the DeFoG README)
 1. New file in `external/DeFoG/src/datasets/`, modelled on `spectre_dataset.py` (unattributed graphs), defining a PyG `Dataset` class and a `DatasetInfos` class.

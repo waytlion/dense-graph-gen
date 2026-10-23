@@ -127,10 +127,8 @@ def create_pair_graph(G_A: nx.Graph, G_B: nx.Graph, mode: str = "join") -> torch
     Returns:
     - Adjacency matrix as torch.FloatTensor of shape (N_A + N_B, N_A + N_B)
     """
-    n_a = G_A.number_of_nodes()
-    n_b = G_B.number_of_nodes()
+    n_a = G_A.number_of_nodes(); n_b = G_B.number_of_nodes()
     n_total = n_a + n_b
-
     adj = torch.zeros((n_total, n_total), dtype=torch.float32)
 
     # Fill internal edges for G_A (top-left block)
@@ -165,8 +163,10 @@ def generate_paired_datasets(
     seed: int = 42,
 ) -> None:
     """
-    Step 3: Sample pairs (G_A, G_B) and generate paired Join (dense)
-    and Union (sparse) datasets with identical base graphs.
+    Step 3: Sample pairs of graphs with replacement (G_A, G_B), where G_A, != G_B
+    -> From pairs generate datasets: 
+        - generate paired Join (dense)
+        - generate Union (sparse)
 
     Args:
     - train_graphs, val_graphs, test_graphs: split base graph lists
@@ -194,10 +194,8 @@ def generate_paired_datasets(
 
         # Sample n_target pairs (idx_a, idx_b) with idx_a != idx_b
         for _ in range(n_target):
-            # Sample two distinct base graphs from the pool
             pair = torch.randperm(pool_size, generator=g_cpu)[:2].tolist()
-            g_a = base_pool[pair[0]]
-            g_b = base_pool[pair[1]]
+            g_a = base_pool[pair[0]], g_b = base_pool[pair[1]]
 
             # Construct dense (join) and sparse (union) adjacency matrices
             dense_list.append(create_pair_graph(g_a, g_b, mode="join"))
