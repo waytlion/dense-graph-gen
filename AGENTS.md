@@ -5,6 +5,7 @@
 - Answer the question asked; stop there!
 - If the request is ambiguous, ask one question.
 - define/describe all variables briefly when using
+- Write minimal/lean code to avoid filling context unnecessarily
 - NEVER add, edit, or modify any code files without explicitly proposing the change and getting user confirmation first!
 - NEVER run any terminal commands or processes without explicit user permission first!
 </output_verbosity_spec>
