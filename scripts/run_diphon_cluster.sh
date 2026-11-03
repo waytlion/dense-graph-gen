@@ -21,14 +21,22 @@ fi
 echo "Job $SLURM_JOB_ID running $MODEL_NAME on $(hostname) at $(date)"
 
 # Workspace and conda environment setup
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+WS_DIR="/data/horse/ws/tibo990i-defog_env"
+REPO_DIR="${SLURM_SUBMIT_DIR:-$HOME/dense-graph-gen}"
 
 export LD_LIBRARY_PATH="$WS_DIR/defog/lib:$LD_LIBRARY_PATH"
-source "$WS_DIR/defog/bin/activate" defog
+export LD_PRELOAD=/usr/lib64/libgomp.so.1
+eval "$(conda shell.bash hook)"
+conda activate "$WS_DIR/defog"
 
 # Ensure required evaluation dependencies are present
 pip install --quiet powerlaw pygsp
+
+# Ensure ORCA is compiled
+if [ ! -f "$REPO_DIR/external/diphon/src/metrics/orca/orca" ]; then
+    echo "Compiling ORCA..."
+    g++ -O2 -std=c++11 -o "$REPO_DIR/external/diphon/src/metrics/orca/orca" "$REPO_DIR/external/diphon/src/metrics/orca/orca.cpp"
+fi
 
 # Ensure datasets are converted to .pkl
 cd "$REPO_DIR"

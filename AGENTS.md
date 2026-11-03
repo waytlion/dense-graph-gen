@@ -51,8 +51,18 @@ We study **graph generation** (learning a distribution p(G) over graphs from sam
 
 ## Implemented DeFoG Integration
 - **Dataset Loader:** `external/DeFoG/src/datasets/cograph_dataset.py` defines `CographDataset` and `CographDataModule` (loads pre-split `.pt` adjacency matrices from `data/cograph_{dense,sparse}/`).
-- **Configs:** Dataset configs in `configs/dataset/cograph_{dense,sparse}.yaml`; experiment configs in `configs/experiment/cograph_{dense,sparse}.yaml` (500 epochs, batch size 256, 500 ODE steps).
-- **Metrics & Registration:** Registered in `external/DeFoG/src/main.py`. Topological validity (`is_valid_cograph_join`, `is_valid_cograph_union`) wired into `external/DeFoG/src/analysis/spectre_utils.py` (quadratic isomorphism bottleneck disabled).
+- **Configs:** Dataset configs in `configs/dataset/cograph_{dense,sparse}.yaml`; experiment configs in `configs/experiment/cograph_{dense,sparse}.yaml` (500 epochs, batch size 256, 500 ODE steps). Reduced batch sizes used for larger graphs: Proteins (16) and COLLAB (8).
+- **Metrics & Registration:** Registered in `external/DeFoG/src/main.py`. Topological validity (`is_valid_cograph_join`, `is_valid_cograph_union`, and 2-component connectivity) wired into `external/DeFoG/src/analysis/spectre_utils.py` (quadratic isomorphism bottleneck disabled).
+- **Validity-Conditioned Subgraph MMD:** Added to `spectre_utils.py`: extracts constituent subgraphs from valid joins/unions and computes `subgraph_degree` and `subgraph_clustering` against reference subgraphs. Completed DeFoG checkpoints on the cluster should be evaluated offline (`general.test_only=<path/to/ckpt>`) to report subgraph MMD.
+- **DeFoG Baseline Status:** All 8 runs (QM9, ZINC, PROTEINS, COLLAB for both dense and sparse) are 100% completed on cluster alpha.
+
+## Implemented DiPhon Integration
+- **Codebase:** Added as submodule `external/diphon/` (Jacobi graph diffusion on graphons, tailored for dense graphs).
+- **Data Export:** `scripts/export_cographs_for_diphon.py` converts `.pt` tensors to `.pkl` dicts of NetworkX graphs (`data/*.pkl`).
+- **Configs:** Created for all 8 variants in `external/diphon/configs/` (`config_cograph_*.py`).
+- **Metrics:** Subgraph extraction and validity-conditioned MMD (`subgraph_degree`, `subgraph_clustering`) wired in `external/diphon/src/metrics/val.py`.
+- **Cluster Runner:** `scripts/run_diphon_cluster.sh` includes `export LD_PRELOAD=/usr/lib64/libgomp.so.1` to resolve the OpenMP runtime symbol collision (`GOMP_5.0 not found`).
+- **SSH Multiplexing:** `ControlMaster auto` in `~/.ssh/config` allows agent commands to reuse an active interactive SSH session to `alpha` without password prompts.
 
 ## Conventions
 - Our own code lives outside the submodule (`data_gen/`, `analysis/`). Changes inside `external/DeFoG/` are limited to dataset/config/registration/metrics files and are committed on the fork's `dense-graphs` branch; then the submodule pointer is committed in the main repo.
