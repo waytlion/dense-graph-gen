@@ -58,7 +58,7 @@ We study **graph generation** (learning a distribution p(G) over graphs from sam
 
 ## Implemented DiPhon Integration
 - **Codebase:** Added as submodule `external/diphon/` (Jacobi graph diffusion on graphons, tailored for dense graphs).
-- **Optimization & Hyperparameters:** Learning rate $\eta = 0.00002$ ($2 \times 10^{-5}$, exactly $10\times$ smaller than DeFoG). The original DiPhon paper trained for 10,000 epochs on tiny synthetic datasets (350 train graphs $\approx$ 50,000 optimizer steps). On our 10,000-graph datasets (157 batches/epoch), 10,000 epochs corresponds to 1,570,000 steps (~9 days), whereas 500–1,000 epochs corresponds to 78k–157k steps, already exceeding the paper's step budget.
+- **Optimization & Hyperparameters:** Learning rate $\eta = 0.00002$ ($2 \times 10^{-5}$, exactly $10\times$ smaller than DeFoG). Epoch budget set to **500 epochs** across all 8 variants with validation every 50 epochs to match DeFoG's evaluation schedule and exceed the paper's original optimization budget (78,500 steps vs 50,000 in the paper).
 - **Data Export:** `scripts/export_cographs_for_diphon.py` converts `.pt` tensors to `.pkl` dicts of NetworkX graphs (`data/*.pkl`).
 - **Configs:** Created for all 8 variants in `external/diphon/configs/` (`config_cograph_*.py`).
 - **Metrics:** Subgraph extraction and validity-conditioned MMD (`subgraph_degree`, `subgraph_clustering`) wired in `external/diphon/src/metrics/val.py`.

@@ -44,6 +44,6 @@ python scripts/export_cographs_for_diphon.py
 
 # Run DiPhon training
 cd "$REPO_DIR/external/diphon"
-python main.py train --model "$MODEL_NAME" --device cuda --wandb
+python -u main.py train --model "$MODEL_NAME" --device cuda --wandb
 
 echo "Job finished at $(date)"
