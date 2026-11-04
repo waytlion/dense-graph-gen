@@ -3,4 +3,4 @@
 	url = git@github.com:waytlion/DeFoG.git
 [submodule "external/diphon"]
 	path = external/diphon
-	url = https://github.com/sergiorozada12/diphon.git
+	url = git@github.com:waytlion/diphon.git
