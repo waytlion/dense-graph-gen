@@ -40,7 +40,7 @@ for exp in "${!CKPTS[@]}"; do
         echo "Error: Checkpoint $ckpt not found, skipping."
         continue
     fi
-    python main.py +experiment="$exp" general.test_only="$ckpt" general.final_model_samples_to_generate=1000
+    python main.py +experiment="$exp" "general.test_only='$ckpt'" general.final_model_samples_to_generate=1000
 done
 
 echo "All evaluations completed at $(date)"
