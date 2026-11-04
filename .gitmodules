@@ -1,6 +1,6 @@
 [submodule "external/DeFoG"]
 	path = external/DeFoG
-	url = git@github.com:waytlion/DeFoG.git
+	url = https://github.com/waytlion/DeFoG.git
 [submodule "external/diphon"]
 	path = external/diphon
-	url = git@github.com:waytlion/diphon.git
+	url = https://github.com/waytlion/diphon.git
