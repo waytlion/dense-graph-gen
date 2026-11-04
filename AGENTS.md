@@ -51,13 +51,14 @@ We study **graph generation** (learning a distribution p(G) over graphs from sam
 
 ## Implemented DeFoG Integration
 - **Dataset Loader:** `external/DeFoG/src/datasets/cograph_dataset.py` defines `CographDataset` and `CographDataModule` (loads pre-split `.pt` adjacency matrices from `data/cograph_{dense,sparse}/`).
-- **Configs:** Dataset configs in `configs/dataset/cograph_{dense,sparse}.yaml`; experiment configs in `configs/experiment/cograph_{dense,sparse}.yaml` (500 epochs, batch size 256, 500 ODE steps). Reduced batch sizes used for larger graphs: Proteins (16) and COLLAB (8).
+- **Configs & Optimization:** Dataset configs in `configs/dataset/cograph_{dense,sparse}.yaml`; experiment configs in `configs/experiment/cograph_{dense,sparse}.yaml` (500 epochs, learning rate $\eta = 0.0002$, batch size 256, 500 ODE steps). Reduced batch sizes used for larger graphs: Proteins (16) and COLLAB (8).
 - **Metrics & Registration:** Registered in `external/DeFoG/src/main.py`. Topological validity (`is_valid_cograph_join`, `is_valid_cograph_union`, and 2-component connectivity) wired into `external/DeFoG/src/analysis/spectre_utils.py` (quadratic isomorphism bottleneck disabled).
 - **Validity-Conditioned Subgraph MMD:** Added to `spectre_utils.py`: extracts constituent subgraphs from valid joins/unions and computes `subgraph_degree` and `subgraph_clustering` against reference subgraphs. Completed DeFoG checkpoints on the cluster should be evaluated offline (`general.test_only=<path/to/ckpt>`) to report subgraph MMD.
 - **DeFoG Baseline Status:** All 8 runs (QM9, ZINC, PROTEINS, COLLAB for both dense and sparse) are 100% completed on cluster alpha.
 
 ## Implemented DiPhon Integration
 - **Codebase:** Added as submodule `external/diphon/` (Jacobi graph diffusion on graphons, tailored for dense graphs).
+- **Optimization & Hyperparameters:** Learning rate $\eta = 0.00002$ ($2 \times 10^{-5}$, exactly $10\times$ smaller than DeFoG). The original DiPhon paper trained for 10,000 epochs on tiny synthetic datasets (350 train graphs $\approx$ 50,000 optimizer steps). On our 10,000-graph datasets (157 batches/epoch), 10,000 epochs corresponds to 1,570,000 steps (~9 days), whereas 500–1,000 epochs corresponds to 78k–157k steps, already exceeding the paper's step budget.
 - **Data Export:** `scripts/export_cographs_for_diphon.py` converts `.pt` tensors to `.pkl` dicts of NetworkX graphs (`data/*.pkl`).
 - **Configs:** Created for all 8 variants in `external/diphon/configs/` (`config_cograph_*.py`).
 - **Metrics:** Subgraph extraction and validity-conditioned MMD (`subgraph_degree`, `subgraph_clustering`) wired in `external/diphon/src/metrics/val.py`.
