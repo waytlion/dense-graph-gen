@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --time=04:00:00
+#SBATCH --time=12:00:00
 #SBATCH --job-name=eval_defog
 #SBATCH --output=/data/horse/ws/tibo990i-defog_env/logs/eval_defog_%j.log
 

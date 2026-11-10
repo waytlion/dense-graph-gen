@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Prepare the full COLLAB dataset (all 5,000 graphs) for both DeFoG and DiPhon.
+Prepare the COLLAB dataset (N <= 200 nodes) for both DeFoG and DiPhon.
 
 Output:
 - DeFoG format: data/collab_pure/{train,val,test}.pt (lists of torch.Tensor adjacency matrices)
@@ -22,6 +22,7 @@ DATA_DIR = Path("data")
 OUT_DEFOG_DIR = DATA_DIR / "collab_pure"
 OUT_DIPHON_FILE = DATA_DIR / "collab_pure.pkl"
 
+MAX_NODES = 200
 TRAIN_RATIO = 0.8
 VAL_RATIO = 0.1
 TEST_RATIO = 0.1
@@ -49,7 +50,7 @@ def prepare_full_collab():
         G_clean.add_edges_from(G.edges())
 
         num_nodes = G_clean.number_of_nodes()
-        if num_nodes == 0:
+        if num_nodes == 0 or num_nodes > MAX_NODES:
             continue
 
         graphs.append(G_clean)

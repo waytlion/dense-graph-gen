@@ -26,6 +26,7 @@ REPO_DIR="${SLURM_SUBMIT_DIR:-$HOME/dense-graph-gen}"
 
 export LD_LIBRARY_PATH="$WS_DIR/defog/lib:$LD_LIBRARY_PATH"
 export LD_PRELOAD=/usr/lib64/libgomp.so.1
+export WANDB_MODE=offline
 eval "$(conda shell.bash hook)"
 conda activate "$WS_DIR/defog"
 

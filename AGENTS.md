@@ -42,6 +42,7 @@ We study **graph generation** (learning a distribution p(G) over graphs from sam
   - Cluster partition: `alpha` (always specify `--nodes=1`, `--gres=gpu:1`).
   - Workspace directory: `/data/horse/ws/tibo990i-defog_env` (contains `data/`, `defog_outputs/`, `logs/`).
   - Outputs and data are symlinked to the workspace to respect the 50 GB `$HOME` quota.
+  - **WANDB_MODE:** All cluster batch scripts MUST `export WANDB_MODE=offline` before running Python, since interactive W&B login is unavailable in non-TTY SLURM jobs.
 
 ## Extending DeFoG with a new dataset (from the DeFoG README)
 1. New file in `external/DeFoG/src/datasets/`, modelled on `spectre_dataset.py` (unattributed graphs), defining a PyG `Dataset` class and a `DatasetInfos` class.
@@ -55,6 +56,7 @@ We study **graph generation** (learning a distribution p(G) over graphs from sam
 - **Metrics & Registration:** Registered in `external/DeFoG/src/main.py`. Topological validity (`is_valid_cograph_join`, `is_valid_cograph_union`, and 2-component connectivity) wired into `external/DeFoG/src/analysis/spectre_utils.py` (quadratic isomorphism bottleneck disabled).
 - **Validity-Conditioned Subgraph MMD:** Added to `spectre_utils.py`: extracts constituent subgraphs from valid joins/unions and computes `subgraph_degree` and `subgraph_clustering` against reference subgraphs. Completed DeFoG checkpoints on the cluster should be evaluated offline (`general.test_only=<path/to/ckpt>`) to report subgraph MMD.
 - **DeFoG Baseline Status:** All 8 runs (QM9, ZINC, PROTEINS, COLLAB for both dense and sparse) are 100% completed on cluster alpha.
+- **Pure COLLAB Baseline:** Filtered to $N \le 200$ nodes (4,715 of 5,000 graphs, 94.3%). DeFoG uses `batch_size: 4`; DiPhon uses `max_node_num: 200`, `batch_size: 4`.
 
 ## Implemented DiPhon Integration
 - **Codebase:** Added as submodule `external/diphon/` (Jacobi graph diffusion on graphons, tailored for dense graphs).
