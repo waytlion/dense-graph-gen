@@ -73,5 +73,11 @@ We study **graph generation** (learning a distribution p(G) over graphs from sam
 - Never commit `data/`, `outputs/`, `wandb/`, checkpoints (`*.ckpt`) or build artefacts (e.g. the compiled `orca` binary).
 - Fix random seeds; datasets must be reproducible from a seed and a config.
 
+## Multi-session coordination
+Several agent sessions may work on this repo in parallel and cannot see each other's conversations.
+- **Read `STATUS.md` first.** It is the shared log of decisions, run states and open to-dos.
+- **Update `STATUS.md` before ending a session** whenever you changed something others depend on (metrics, data, configs, job states): what changed, why, what it invalidates (e.g. "metrics changed → all cograph runs need re-eval").
+- Before committing, check `git status` in the main repo **and both submodules**; stage files by name (never `git commit -a`) so other sessions' work in progress isn't swept in.
+
 ## Open questions (not yet decided)
 - The exact definition of "simple structure": rank-width vs. another notion (to confirm with the PI).

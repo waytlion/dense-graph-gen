@@ -12,10 +12,12 @@ SPLITS = ("train", "val", "test")
 
 def convert_dataset(ds_dir: Path):
     out_path = DATA_DIR / f"{ds_dir.name}.pkl"
-    if out_path.exists():
-        return print(f"Skipping {ds_dir.name}: {out_path} already exists.")
-    if not all((ds_dir / f"{s}.pt").exists() for s in SPLITS):
+    pts = [ds_dir / f"{s}.pt" for s in SPLITS]
+    if not all(p.exists() for p in pts):
         return print(f"Skipping {ds_dir.name}: missing split .pt files.")
+    # Re-export if any .pt is newer than the .pkl (i.e. the dataset was regenerated).
+    if out_path.exists() and out_path.stat().st_mtime >= max(p.stat().st_mtime for p in pts):
+        return print(f"Skipping {ds_dir.name}: {out_path} is up to date.")
 
     print(f"Converting {ds_dir.name} -> {out_path}...")
     dataset = {
