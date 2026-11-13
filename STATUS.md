@@ -1,117 +1,72 @@
-# Project Status — Handoff Notes (2026-11-12)
+# Project Status: Handoff Notes (updated 2026-11-13)
 
-## Current Phase
-Validating **Hypothesis 1**: DeFoG and DiPhon baselines perform poorly on dense, low-rank-width cographs vs. sparse counterparts.
+Every session reads this first (see AGENTS.md → Multi-session coordination) and updates it before ending.
 
-## Training Runs Status
+---
 
-### DeFoG Cograph Training (all 8 COMPLETE ✅)
-All 500-epoch runs finished on cluster alpha. Checkpoints at:
-`/data/horse/ws/tibo990i-defog_env/defog_outputs/2026-10-26/`
+## 1. Goal (highest level)
+- **Hypothesis 1 (current phase):** state-of-the-art graph generators (DeFoG, DiPhon) perform worse on **dense, low-rank-width** graphs (cograph **joins**) than on **sparse** graphs built from the same building blocks (cograph **unions**).
+- **Hypothesis 2 (later):** a model that generates a decomposition tree first, then the graph (TD-GEN-style), does better.
+- Open: is rank-width the right notion of "simple structure"? (confirm with PI)
 
-### DeFoG Offline Evaluation (5 of 8 done)
-Script: `scripts/eval_defog_checkpoints.sh` (generates 1000 samples per checkpoint, computes MMD + validity + subgraph metrics).
+## 2. Agenda: next experiments (medium level, in order)
+1. **Make evaluation trustworthy and comparable (DeFoG vs DiPhon)**: we're in exploration mode, so keep it minimal. No full offline pipeline for now.
+   - Training behaviour: validation every 50 epochs, generated graphs vs **val** set. Since 2026-11-13, both models save the generated graphs (`val_samples/epoch<N>.pkl`; DeFoG: run output dir, DiPhon: `checkpoints/<name>/val_samples/`), so new metrics can be recomputed on CPU without sampling again. Counts: DeFoG 40, DiPhon 64 (not equal yet; noisy).
+   - Final performance: final checkpoint, ~1000 graphs vs **test** set.
+   - Metrics: the old subgraph MMD was replaced by the **dejoin MMD** (DeFoG `20f769c`, DiPhon `ad5150f`), so **all earlier cograph metric numbers are outdated**.
+   - Still to decide: x-axis epochs vs optimizer steps (batch sizes differ between models); evaluate both with EMA weights? (DiPhon uses EMA; check DeFoG).
+2. **Rerun what's needed** (details in §3):
+   - collab_pure: resubmit DeFoG; let DiPhon finish (it hits its walltime).
+   - Re-evaluate **all 16 cograph runs** (8 DeFoG, 8 DiPhon) with the dejoin metrics. No retraining needed, only evaluation.
+   - Make sure DiPhon has finished training on **all 8** cograph datasets.
+   - Before re-evaluating DiPhon, delete stale reference metrics: `rm -v /data/horse/ws/tibo990i-defog_env/data/ref_metrics/ref_metrics_cograph_*.pt*`
+3. **Analyse:** dense vs sparse per base dataset, DeFoG vs DiPhon, training curves and final test numbers → does it support Hypothesis 1?
 
-**Completed results:**
+## 3. Where each experiment stands (low level, 2026-11-13 17:00)
 
-| Dataset | Type | Validity | subgraph_degree | subgraph_clustering |
-|---------|------|----------|----------------|-------------------|
-| cograph_sparse (QM9) | union | 99.5% | 0.0009 | 0.0115 |
-| cograph_zinc_sparse | union | 99.6% | 0.0004 | 0.0003 |
-| cograph_zinc_dense | join | 99.8% | 0.0026 | 0.0379 |
-| cograph_proteins_dense | join | 99.1% | **0.468** | 0.089 |
-| cograph_proteins_sparse | union | 97.4% | 0.012 | 0.078 |
+| Run | Training | Evaluation | Next action |
+|---|---|---|---|
+| DeFoG, 8 cograph datasets | ✅ done (500 ep, `defog_outputs/2026-10-26/`) | old metrics: 5/8 evaluated; 3 timed out at 12h (`cograph_dense`, `cograph_collab_dense`, `cograph_collab_sparse`) | re-eval all 8 with dejoin metrics; collab ones need >12h or fewer samples |
+| DiPhon cograph QM9 dense/sparse, ZINC dense/sparse | ✅ done (jobs 2391088–91) | old metrics only | re-eval with dejoin metrics |
+| DiPhon cograph PROTEINS dense/sparse, COLLAB dense/sparse | failed Nov 10 (RAM OOM / W&B timeout), relaunched; job **2392887 (cograph_proteins_\*) running** on 11-13 | n/a | **verify** which of the 4 relaunches run/finished (logs: `diphon_diphon_<jobid>.log`) |
+| DeFoG collab_pure | ❌ job 2392883 OOM on 11-12; cause: it trained on **unfiltered** COLLAB (stale DeFoG data cache, up to 492 nodes). Fixed 11-13. | n/a | **resubmit**; log must show 4,715 graphs and `max num nodes: 200` |
+| DiPhon collab_pure | 🏃 job 2392882, epoch 128/500 at 11-13 17:00, ~12 min/epoch; will hit the **2-day walltime ~11-14 09:00 at epoch ~195** | n/a | check whether DiPhon can resume from `last.ckpt`; otherwise rerun with a longer walltime |
 
-**Missing (timed out at 12h):** `cograph_dense` (QM9), `cograph_collab_dense`, `cograph_collab_sparse`
+## 4. Housekeeping to-dos
+- **FIRST (next session):** move DiPhon `checkpoints/` (8.3 GB) and `wandb/` from cluster home to horse once no DiPhon job runs. Commands in the agent memory note `todo-move-diphon-outputs`; target `/data/horse/ws/tibo990i-defog_env/diphon_outputs`.
+- Optional: set git push URL to SSH in the main repo and `external/diphon` (`git remote set-url --push origin git@github.com:waytlion/<repo>.git`). Their `origin` is HTTPS without stored credentials, so a plain `git push` fails on the laptop.
 
-### DiPhon Cograph Training (4 of 8 done)
+## 5. Key findings so far (⚠️ based on the OLD subgraph metrics, to be re-validated)
+- DeFoG handles QM9/ZINC cographs well (dense and sparse): validity >99%.
+- DeFoG on PROTEINS-dense: validity 99.1% but subgraph_degree MMD 0.468 (vs 0.012 sparse), a signal for Hypothesis 1.
+- DiPhon struggles with **sparse** (union) cographs: union validity 4.7–21.9% (QM9/ZINC) vs 90–94% join validity.
+- DiPhon needs much smaller batch sizes (always pads to max N).
 
-**Completed (500 epochs):**
+## 6. Reference: how things work (learned 2026-11-13)
+- **Data pipeline:** `data/<name>/{train,val,test}.pt` (on horse) is the source.
+  - DeFoG copies it into `external/DeFoG/data/<name>/raw/` and builds a cache in `processed/`. This folder is a symlink to `/data/horse/ws/tibo990i-defog_env/defog_data`.
+  - DiPhon reads `data/<name>.pkl`, made by `scripts/export_cographs_for_diphon.py` (collab_pure: `scripts/prepare_collab_pure.py` writes both formats).
+  - The caches now rebuild automatically when the source changes:
+    - DeFoG `source_fingerprint.txt`
+    - DiPhon `ref_metrics_*.pt.src`
+    - export re-runs if `.pt` is newer than `.pkl`
+  - They do **not** notice metric-code changes → delete DiPhon `ref_metrics` by hand after a metric change.
+  - Verified 11-13: `.pt` and `.pkl` agree for all 11 datasets (counts, max N, edges).
+- **GPU memory (both models: same graph transformer, fp32):** ≈ L·B·n²·c·4 bytes + 2–4 GB.
+  - L = layers (10), B = batch size, n = largest graph in batch, c ≈ 2,300 (values stored per node pair per layer for backward; hand count, ±30%).
+  - n=200, B=4 → ~17–19 GB. Max n on a 40 GB A100 with B=4 ≈ 310.
+  - Memory grows with n², independent of edge count.
+- **Cluster:**
+  - When alpha's login is in maintenance, use `ssh tibo990i@login2.romeo.hpc.tu-dresden.de` (no GPU; same home and horse filesystems; `squeue` for alpha hangs there).
+  - Running Python on romeo needs `export LD_LIBRARY_PATH=/data/horse/ws/tibo990i-defog_env/defog/lib:$LD_LIBRARY_PATH`.
+  - The login node kills big jobs; use `srun --account=p_scads_graphgen3d --partition=romeo --mem=64G ...`.
+- **Walltimes:** DiPhon script `--time=2-00:00:00` (too short for collab_pure); DeFoG eval 12h (too short for collab cographs with 1000 samples).
+- **DeFoG eval example:** see `scripts/eval_defog_checkpoints.sh`; single checkpoint: `python main.py +experiment=<exp> "general.test_only='<ckpt>'" general.final_model_samples_to_generate=1000`. To recompute metrics from saved graphs without sampling: `general.generated_path=<generated_samples_rank0.pkl>`.
 
-| Job | Dataset | Time | join/union_acc | subgraph_degree | subgraph_clustering |
-|-----|---------|------|---------------|----------------|-------------------|
-| 2391088 | cograph_dense (QM9) | 16h | join 93.8% | 0.004 | 0.021 |
-| 2391089 | cograph_sparse (QM9) | 15.8h | union 21.9% | 0.003 | 0.054 |
-| 2391090 | cograph_zinc_dense | 34h | join 90.6% | 0.239 | 0.033 |
-| 2391091 | cograph_zinc_sparse | 33h | union 4.7% | 0.093 | 0.010 |
-
-**Failed — need relaunch:**
-
-| Job | Dataset | Failure | Root Cause | Fix |
-|-----|---------|---------|-----------|-----|
-| 2391092 | cograph_proteins_dense | OOM (RAM) | batch_size=16, max_node_num=100 | batch_size → 8 |
-| 2391093 | cograph_proteins_sparse | W&B timeout | ServiceStartTimeoutError | Already have WANDB_MODE=offline in script; just rerun |
-| 2391094 | cograph_collab_dense | OOM (RAM, 4min) | batch_size=8, max_node_num=180 | batch_size → 4 |
-| 2391095 | cograph_collab_sparse | OOM (RAM, 6min) | batch_size=8, max_node_num=180 | batch_size → 2 |
-
-### Pure COLLAB Baseline (currently running 🏃)
-- **Data prep** (job 2391086): ✅ COMPLETE — 4,715 graphs with N≤200 (filtered from 5,000)
-- **DeFoG collab_pure** (job 2392883): 🏃 RUNNING since Nov 10 (~500 epochs, batch_size=4)
-- **DiPhon collab_pure** (job 2392882): 🏃 RUNNING since Nov 10 (~500 epochs, max_node_num=200, batch_size=4)
-
-## Immediate Next Steps
-
-### 1. Fix DiPhon batch sizes and relaunch 4 failed runs
-Easiest via SSH+sed directly on cluster (no git push needed):
-```bash
-ssh alpha "
-  # Proteins: batch_size 16→8
-  sed -i 's/batch_size: int = 16/batch_size: int = 8/' ~/dense-graph-gen/external/diphon/configs/config_cograph_proteins_dense.py
-  sed -i 's/batch_size: int = 16/batch_size: int = 8/' ~/dense-graph-gen/external/diphon/configs/config_cograph_proteins_sparse.py
-  # COLLAB cographs: batch_size 8→4 (dense) and 8→2 (sparse)
-  sed -i 's/batch_size: int = 8/batch_size: int = 4/' ~/dense-graph-gen/external/diphon/configs/config_cograph_collab_dense.py
-  sed -i 's/batch_size: int = 8/batch_size: int = 2/' ~/dense-graph-gen/external/diphon/configs/config_cograph_collab_sparse.py
-"
-ssh alpha "cd ~/dense-graph-gen && \
-  sbatch scripts/run_diphon_cluster.sh cograph_proteins_dense && \
-  sbatch scripts/run_diphon_cluster.sh cograph_proteins_sparse && \
-  sbatch scripts/run_diphon_cluster.sh cograph_collab_dense && \
-  sbatch scripts/run_diphon_cluster.sh cograph_collab_sparse"
-```
-**After these complete**, also update local configs to match and commit.
-
-### 2. Relaunch DeFoG eval for 3 missing checkpoints
-Either increase walltime to 24h and rerun all, or create per-checkpoint sbatch wraps for the 3 missing:
-- `cograph_dense` (QM9 dense)
-- `cograph_collab_dense`
-- `cograph_collab_sparse`
-
-Example per-checkpoint:
-```bash
-sbatch -A p_scads_graphgen3d -p alpha --nodes=1 --gres=gpu:1 --cpus-per-task=4 --mem=32G \
-  --time=04:00:00 --job-name=eval_cograph_dense \
-  --output=/data/horse/ws/tibo990i-defog_env/logs/eval_cograph_dense_%j.log \
-  --wrap="export LD_LIBRARY_PATH=/data/horse/ws/tibo990i-defog_env/defog/lib:\$LD_LIBRARY_PATH && \
-  export WANDB_MODE=offline && \
-  eval \"\$(conda shell.bash hook)\" && conda activate /data/horse/ws/tibo990i-defog_env/defog && \
-  cd ~/dense-graph-gen/external/DeFoG/src && \
-  python main.py +experiment=cograph_dense \"general.test_only='/data/horse/ws/tibo990i-defog_env/defog_outputs/2026-10-26/14-58-02-cograph_dense-cograph_dense/checkpoints/cograph_dense/epoch=499.ckpt'\" general.final_model_samples_to_generate=1000"
-```
-Repeat for `cograph_collab_dense` and `cograph_collab_sparse` with their respective checkpoint paths (see `scripts/eval_defog_checkpoints.sh` for paths).
-
-### 3. After all runs complete
-- Collect all DeFoG + DiPhon results into a comparison table
-- Key comparison: dense (join) vs sparse (union) for each base graph set
-- Analyze whether DeFoG/DiPhon struggle more with dense cographs (supporting Hypothesis 1)
-
-## Key Findings So Far
-- **DeFoG handles QM9/ZINC cographs well** (both dense and sparse): validity >99%, low subgraph MMD
-- **DeFoG struggles with Proteins-dense** cographs: validity still high (99.1%) but subgraph_degree MMD is **0.468** (vs 0.012 for sparse) — strong signal for Hypothesis 1
-- **DiPhon struggles significantly with sparse (union) cographs**: union validity is very low (4.7%–21.9% for QM9/ZINC sparse vs 87.5%–93.8% for dense joins)
-- **DiPhon zinc_sparse is nearly non-functional**: only 4.7% union validity
-- DiPhon requires **much smaller batch sizes** than DeFoG due to dense N×N adjacency padding
-
-## Workflow Tips for Cluster
-- **SSH multiplexing**: `ControlMaster auto` in `~/.ssh/config` lets agent reuse your active SSH session
-- **Quick config tweaks**: Use `ssh alpha "sed -i ..."` instead of commit-push-pull cycle
-- **CLI overrides**: DiPhon supports `--batch-size N` flag; DeFoG supports Hydra overrides
-- **All SLURM jobs MUST**: `--account=p_scads_graphgen3d`, `--partition=alpha`, `--nodes=1`, `--gres=gpu:1`
-- **All batch scripts MUST**: `export WANDB_MODE=offline` (no interactive W&B login in SLURM)
-
-## File Locations on Cluster
+## File locations on cluster
 - Conda env: `/data/horse/ws/tibo990i-defog_env/defog`
-- DeFoG checkpoints: `/data/horse/ws/tibo990i-defog_env/defog_outputs/2026-10-26/`
+- DeFoG outputs/checkpoints: `/data/horse/ws/tibo990i-defog_env/defog_outputs/` (symlinked from `external/DeFoG/outputs`)
+- DeFoG data cache: `/data/horse/ws/tibo990i-defog_env/defog_data/` (symlinked from `external/DeFoG/data`)
+- Source data: `~/dense-graph-gen/data/` → `/data/horse/ws/tibo990i-defog_env/data/`
 - Logs: `/data/horse/ws/tibo990i-defog_env/logs/`
-- Data: `~/dense-graph-gen/data/` (symlinked to workspace)
-- DiPhon results: `~/dense-graph-gen/external/diphon/results/`
-
+- DiPhon checkpoints/wandb: still in `~/dense-graph-gen/external/diphon/` (home!), see §4
