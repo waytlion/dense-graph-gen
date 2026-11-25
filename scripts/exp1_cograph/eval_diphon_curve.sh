@@ -19,7 +19,8 @@ RUN=${RUNS[$SLURM_ARRAY_TASK_ID]}
 OUT=$WS/diphon_outputs/curve_eval/$RUN; mkdir -p $OUT
 
 export WANDB_MODE=offline LD_LIBRARY_PATH=$WS/defog/lib:$LD_LIBRARY_PATH
-export LD_PRELOAD=/usr/lib64/libgomp.so.1 SKIP_REF=1      # ratios ignored -> skip slow ref metrics
+export LD_PRELOAD=/usr/lib64/libgomp.so.1 WANDB__SERVICE_WAIT=300
+# no SKIP_REF: `gen` prints ref metrics and crashes on None (main.py:573); refs are cached after the first ckpt
 eval "$(conda shell.bash hook)"; conda activate $WS/defog
 cd ${SLURM_SUBMIT_DIR:-$HOME/dense-graph-gen}/external/diphon
 

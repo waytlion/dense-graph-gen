@@ -18,7 +18,7 @@ RUN=${RUNS[$SLURM_ARRAY_TASK_ID]}; EXP=${RUN#*-*-*-}      # strip "HH-MM-SS-"
 CKPT_DIR=$WS/defog_outputs/2026-10-26/$RUN-$EXP/checkpoints/$EXP
 OUT=$WS/defog_outputs/curve_eval/$EXP                     # one folder per checkpoint
 
-export WANDB_MODE=offline LD_LIBRARY_PATH=$WS/defog/lib:$LD_LIBRARY_PATH
+export WANDB_MODE=offline WANDB__SERVICE_WAIT=300 LD_LIBRARY_PATH=$WS/defog/lib:$LD_LIBRARY_PATH
 eval "$(conda shell.bash hook)"; conda activate $WS/defog
 cd ${SLURM_SUBMIT_DIR:-$HOME/dense-graph-gen}/external/DeFoG/src
 
